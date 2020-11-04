@@ -1,0 +1,1 @@
+{"parameters_ranges": {"f": [0.01, 1.0], "cr": [0.01, 1.0]}, "constant_parameters": {"pop_size": 100, "v": 0.5}}

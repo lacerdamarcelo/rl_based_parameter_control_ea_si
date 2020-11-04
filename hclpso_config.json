@@ -1,0 +1,1 @@
+{"parameters_ranges": {"w": [0, 1], "c": [0.0, 4.0], "c1": [0.0, 4.0], "c2": [0.0, 4.0], "m": [1, 10]}, "constant_parameters": {"pop_explr_size": 50, "pop_explt_size": 50, "v": 0.5}}

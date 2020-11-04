@@ -1,0 +1,1 @@
+{"parameters_ranges": {"indiv_step": [0.0, 0.1], "vol_step": [-0.2, 0.2]}, "constant_parameters": {"v": 0.5, "max_weight": 5000, "pop_size": 100}}
