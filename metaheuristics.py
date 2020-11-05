@@ -5,13 +5,9 @@ import time
 import math
 import random
 import numpy as np
-from deap import base
-from deap import tools
-from deap import creator
 from scipy.spatial import distance
 from gym.spaces import discrete, box
 from utils import modify_population_size
-from pyswarms.discrete.binary import BinaryPSO
 
 class HCLPSO:
     def __init__(self, parameters, problem):
@@ -312,119 +308,6 @@ class FSS:
         return 1
 
 
-class GA:
-
-    def __init__(self, parameters, problem):
-        self.problem = problem
-        self.pop_size = parameters['pop_size']
-        self.prob_mutation_att = parameters['prob_mutation_att']
-        self.mutation_prob = parameters['mutation_prob']
-        self.crossover_prob = parameters['crossover_prob']
-        self.tournament_size = int(round(parameters['tournament_size'], 0))
-        self.elitism_size = int(round(parameters['elitism_size'], 0))
-        self.v = parameters['v']
-        self.binary_encoding = bool(parameters['binary_encoding'])
-
-        creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-        creator.create("Individual", list, fitness=creator.FitnessMax)
-
-        IND_SIZE=self.problem.get_dimensions()
-
-        self.toolbox = base.Toolbox()
-        if self.binary_encoding:
-            self.toolbox.register("binary", np.random.randint, 0, 2, IND_SIZE)
-            self.toolbox.register("individual", tools.initIterate, creator.Individual,
-                             self.toolbox.binary)
-        else:
-            self.toolbox.register("indices", random.sample, range(IND_SIZE), IND_SIZE)
-            self.toolbox.register("individual", tools.initIterate, creator.Individual,
-                             self.toolbox.indices)
-        
-        self.toolbox.register("population", tools.initRepeat, list, self.toolbox.individual)
-        
-        if self.binary_encoding:
-            self.toolbox.register("mate", tools.cxOnePoint)
-            self.toolbox.register("mutate", tools.mutFlipBit, indpb=self.prob_mutation_att)
-        else:
-            self.toolbox.register("mate", tools.cxOrdered)
-            self.toolbox.register("mutate", tools.mutShuffleIndexes, indpb=self.prob_mutation_att)
-        self.toolbox.register("select", tools.selTournament, tournsize=self.tournament_size,
-                              k=self.pop_size - self.elitism_size)
-        self.toolbox.register("tournamentSelection", tools.selRoulette)
-        self.toolbox.register("selectMax", tools.selBest, k=self.elitism_size)
-        self.toolbox.register("evaluate", problem.evaluate)
-
-        self.population = self.toolbox.population(n=self.pop_size)
-        self.fitnesses = np.array(list(self.toolbox.map(self.toolbox.evaluate, self.population)))
-        for i, fitness in enumerate(self.fitnesses):
-            self.population[i].fitness.values = [fitness]
-        self.best_fitness_ever = self.fitnesses.max()
-
-    def __str__(self):
-        return 'GA'
-
-    def get_best_worst_fitnesses(self):
-        return self.fitnesses.min(), self.fitnesses.max()
-    
-    def get_best_position(self):
-        highest_fitness_index = np.argmax(self.fitnesses)
-        return self.population[highest_fitness_index]
-    
-    def get_population(self):
-        return np.array(self.population)
-    
-    def get_fitnesses(self):
-        return self.fitnesses
-    
-    def modify_population(self):
-        raise NotImplementedError
-
-    def set_parameters(self, parameters):
-        self.pop_size = parameters['pop_size']
-        self.prob_mutation_att = parameters['prob_mutation_att']
-        self.mutation_prob = parameters['mutation_prob']
-        self.crossover_prob = parameters['crossover_prob']
-        self.tournament_size = int(round(parameters['tournament_size'], 0))
-        self.elitism_size = int(round(parameters['elitism_size'], 0))
-        # Not used modify_population parameter (which is not implemented)
-        self.v = parameters['v']
-        self.binary_encoding = bool(parameters['binary_encoding'])
-
-    def run(self, current_budget):
-        offspring = []
-        for i in range(int(self.pop_size)):
-            if random.random() < self.crossover_prob:
-                exit_selection = False
-                while exit_selection is False:
-                    selected = self.toolbox.tournamentSelection(self.population, 2)
-                    if len(selected) == 2:
-                        exit_selection = True
-                child1, child2 = self.toolbox.mate(selected[0], selected[1])
-                if random.random() < self.mutation_prob:
-                    self.toolbox.mutate(child1)
-                if random.random() < self.mutation_prob:
-                    self.toolbox.mutate(child2)
-                child1.fitness.values = [self.toolbox.evaluate(child1)]
-                child2.fitness.values = [self.toolbox.evaluate(child2)]
-                offspring.append(child1)
-                offspring.append(child2)
-
-        # Apply mutation on the offspring
-        for mutant in self.population:
-            if random.random() < self.mutation_prob:
-                self.toolbox.mutate(mutant)
-        for i in range(len(self.population)):
-            self.population[i].fitness.values = [self.toolbox.evaluate(self.population[i])]
-
-        # Select the next generation individuals
-        self.population[:] = self.toolbox.select(self.population + offspring)
-        self.population[:] = self.population + self.toolbox.selectMax(self.population)
-        self.fitnesses = np.array(list(self.toolbox.map(self.toolbox.evaluate, self.population)))
-        max_fitness = self.fitnesses.max()
-        if max_fitness > self.best_fitness_ever:
-            self.best_fitness_ever = max_fitness
-        return 1
-
 
 class BinGA:
 
@@ -521,61 +404,6 @@ class BinGA:
         if max_fitness > self.best_fitness_ever:
             self.best_fitness_ever = max_fitness
             self.best_position_ever = self.get_best_position()
-        return 1
-
-
-class BinPSO:
-
-    def __init__(self, parameters, problem):
-        self.problem = problem
-        self.pop_size = parameters['pop_size']
-        self.c1 = parameters['c1']
-        self.c2 = parameters['c2']
-        self.w = parameters['w']
-        self.k = int(round(parameters['k'], 0))
-        self.p = parameters['p']
-        self.v = parameters['v']
-        self.optimizer = BinaryPSO(n_particles=self.pop_size, dimensions=self.problem.get_dimensions(),
-                                   options={'c1': self.c1, 'c2': self.c2, 'w': self.w, 'k': self.k, 'p': self.p})
-        self.optimizer.optimize(lambda x: -1 * self.problem.evaluate_batch(x), 1, verbose=False)
-        self.population = self.optimizer.swarm.position
-        self.fitnesses = self.optimizer.swarm.current_cost
-        self.best_fitness_ever = self.optimizer.swarm.best_cost
-
-    def __str__(self):
-        return 'BinPSO'
-
-    def get_best_worst_fitnesses(self):
-        return self.fitnesses.min(), self.fitnesses.max()
-    
-    def get_best_position(self):
-        highest_fitness_index = np.argmax(self.fitnesses)
-        return self.population[highest_fitness_index]
-    
-    def get_population(self):
-        return np.array(self.population)
-    
-    def get_fitnesses(self):
-        return self.fitnesses
-    
-    def modify_population(self):
-        raise NotImplementedError
-
-    def set_parameters(self, parameters):
-        self.pop_size = parameters['pop_size']
-        self.c1 = parameters['c1']
-        self.c2 = parameters['c2']
-        self.w = parameters['w']
-        self.k = int(round(parameters['k'], 0))
-        self.p = parameters['p']
-        self.v = parameters['v']
-
-    def run(self, current_budget):
-        self.optimizer.optimize(lambda x: -1 * self.problem.evaluate_batch(x), 1, verbose=False)
-        self.population = self.optimizer.swarm.position
-        self.fitnesses = self.optimizer.swarm.current_cost
-        if self.optimizer.swarm.best_cost < self.best_fitness_ever:
-            self.best_fitness_ever = self.optimizer.swarm.best_cost
         return 1
 
 

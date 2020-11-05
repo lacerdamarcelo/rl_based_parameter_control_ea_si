@@ -1,0 +1,1 @@
+{"parameters_ranges": {"prob_mutation_att": [0.001, 1], "crossover_prob": [0.001, 1], "elitism_size": [1, 5]}, "constant_parameters": {"pop_size": 100, "v": 0.5}}
